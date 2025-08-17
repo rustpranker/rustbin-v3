@@ -1,41 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" >
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RUSTBIN • IP Consent</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @keyframes glitch {
-      0%, 40%, 80% { text-shadow: 2px 0 rgba(255,0,0,.5), -2px 0 rgba(0,255,255,.5); }
-      20%, 60%, 100% { text-shadow: -2px 0 rgba(255,0,0,.5), 2px 0 rgba(0,255,255,.5); }
-    }
-    .scanline::after {
-      content: "";
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.03) 0px,
-        rgba(255,255,255,0.03) 2px,
-        transparent 3px,
-        transparent 6px
-      );
-      pointer-events: none;
-      mix-blend-mode: overlay;
-      border-radius: 1rem;
-    }
-    .glow { box-shadow: 0 0 40px rgba(0,255,170,.15), inset 0 0 40px rgba(0,255,170,.05); }
+    /* Твой дизайн (можешь вставить сюда свои стили) */
   </style>
 </head>
 <body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200">
-  <main class="min-h-screen flex items-center justify-center p-4 relative">
+  <main class="min-h-screen flex items-center justify-center p-4">
     <div class="relative w-full max-w-2xl bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow">
       <div class="text-center space-y-6">
         <h1 class="text-4xl md:text-5xl font-black tracking-tight">
           <span class="block text-neutral-300">RUSTBIN</span>
           <span class="block mt-2 text-emerald-300 animate-[glitch_1.2s_infinite]">Main Menu</span>
         </h1>
-        <p id="question" class="text-lg md:text-xl text-neutral-300">open rustbin?</p>
+        <p id="question" class="text-lg md:text-xl text-neutral-300">Open rustbin?</p>
         <div id="actions" class="flex items-center justify-center gap-4">
           <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold">
             YES
@@ -46,14 +28,22 @@
         </div>
         <p id="status" class="h-6 text-sm"></p>
         <div class="text-xs text-neutral-400 leading-relaxed max-w-xl mx-auto">
-          By clicking <span class="text-emerald-300 font-semibold">YES</span>, your IP will be saved and you'll be redirected.<br>
+          By clicking <span class="text-emerald-300 font-semibold">YES</span>, your IP will be saved.<br>
           Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
         </div>
+      </div>
+      <div class="absolute -bottom-3 left-6 right-6 text-center">
+        <a href="get.html" id="getBtn" class="inline-block px-3 py-1 text-[10px] tracking-widest uppercase bg-neutral-800 border border-neutral-700 rounded-full text-neutral-400 hover:text-emerald-300 hover:border-emerald-300 transition">
+          GET
+        </a>
       </div>
     </div>
   </main>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
+
     const yesBtn = document.getElementById('yesBtn');
     const noBtn = document.getElementById('noBtn');
     const statusEl = document.getElementById('status');
@@ -63,6 +53,19 @@
       statusEl.textContent = msg || '';
       statusEl.className = `h-6 text-sm ${colorClass || ''}`;
     }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
+      authDomain: "test-f5bde.firebaseapp.com",
+      projectId: "test-f5bde",
+      storageBucket: "test-f5bde.appspot.com",
+      messagingSenderId: "803807833739",
+      appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
+      measurementId: "G-JXNNEMMRDC"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
     async function fetchJSON(url) {
       const r = await fetch(url, { cache: 'no-store' });
@@ -110,28 +113,26 @@
       try {
         const ip = await getPublicIP();
         const ua = navigator.userAgent || 'unknown';
+        const docId = ip.replace(/\./g, '_').replace(/:/g, '_');
 
-        // Получаем текущий список IP из localStorage или создаем новый
-        let savedIPs = JSON.parse(localStorage.getItem('savedIPs') || '[]');
+        await setDoc(doc(db, 'ip_logs', docId), {
+          ip,
+          ua,
+          consent: true,
+          ts: serverTimestamp()
+        });
 
-        // Добавляем новый объект, если IP уникален
-        if (!savedIPs.some(item => item.ip === ip)) {
-          savedIPs.push({
-            ip,
-            ua,
-            ts: new Date().toISOString()
-          });
-          localStorage.setItem('savedIPs', JSON.stringify(savedIPs));
-        }
-
-        setStatus('IP saved! Redirecting…', 'text-emerald-400 font-semibold');
-
-        setTimeout(() => {
-          window.location.href = 'get.html';
-        }, 1500);
+        setStatus('IP saved successfully!', 'text-emerald-400 font-semibold');
       } catch (e) {
         console.error(e);
-        setStatus('Failed to get IP. Check network or try again.', 'text-red-400');
+        const msg = String(e && e.code ? e.code : e.message || e);
+        if (msg.includes('permission-denied')) {
+          setStatus('Permission denied. Check Firestore rules.', 'text-red-400');
+        } else if (msg.includes('Failed to fetch') || msg.includes('HTTP')) {
+          setStatus('IP service blocked. Check your network/AdBlock.', 'text-red-400');
+        } else {
+          setStatus('Error. Check console for details.', 'text-red-400');
+        }
         yesBtn.disabled = false;
         noBtn.disabled = false;
         actions.classList.remove('opacity-60');
@@ -139,7 +140,12 @@
     });
 
     noBtn.addEventListener('click', () => {
-      window.location.replace('about:blank');
+      window.location.href = 'about:blank';
+    });
+
+    window.addEventListener('unhandledrejection', (ev) => {
+      console.error('Unhandled rejection', ev.reason);
+      setStatus('Runtime error: ' + (ev.reason?.message || ev.reason), 'text-red-400');
     });
   </script>
 </body>
