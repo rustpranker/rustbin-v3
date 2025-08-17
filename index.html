@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RUSTBIN • New era</title>
+  <title>RUSTBIN • IP Consent</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes glitch {
@@ -25,18 +25,9 @@
       border-radius: 1rem;
     }
     .glow { box-shadow: 0 0 40px rgba(0,255,170,.15), inset 0 0 40px rgba(0,255,170,.05); }
-
-    /* Fixed Get button bottom right */
-    #getBtn {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 50;
-      cursor: pointer;
-    }
   </style>
 </head>
-<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200">
+<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200 relative">
   <main class="min-h-screen flex items-center justify-center p-4">
     <div class="relative w-full max-w-2xl bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow">
       <div class="text-center space-y-6">
@@ -44,7 +35,7 @@
           <span class="block text-neutral-300">RUSTBIN</span>
           <span class="block mt-2 text-emerald-300 animate-[glitch_1.2s_infinite]">Main Menu</span>
         </h1>
-        <p id="question" class="text-lg md:text-xl text-neutral-300">Open rustbin?</p>
+        <p id="question" class="text-lg md:text-xl text-neutral-300">open rustbin?</p>
         <div id="actions" class="flex items-center justify-center gap-4">
           <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold">
             YES
@@ -55,7 +46,7 @@
         </div>
         <p id="status" class="h-6 text-sm"></p>
         <div class="text-xs text-neutral-400 leading-relaxed max-w-xl mx-auto">
-          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you move to main page.<br>
+          By clicking <span class="text-emerald-300 font-semibold">YES</span>, your IP will be saved.<br>
           Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
         </div>
       </div>
@@ -65,28 +56,15 @@
     </div>
   </main>
 
-  <!-- Get Button -->
-  <button id="getBtn" class="px-4 py-2 rounded-xl border border-emerald-400/50 hover:border-emerald-400 transition font-semibold bg-neutral-900/70 text-emerald-300">
+  <!-- Кнопка Get в углу -->
+  <a href="get.html" class="fixed bottom-4 right-4 px-4 py-2 rounded-xl border border-emerald-400/50 hover:border-emerald-400 text-emerald-300 font-semibold cursor-pointer select-none shadow-glow transition">
     Get
-  </button>
+  </a>
 
-  <!-- Firebase + App Logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
     import { getFirestore, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
 
-    const yesBtn = document.getElementById('yesBtn');
-    const noBtn = document.getElementById('noBtn');
-    const statusEl = document.getElementById('status');
-    const actions = document.getElementById('actions');
-    const getBtn = document.getElementById('getBtn');
-
-    function setStatus(msg, colorClass) {
-      statusEl.textContent = msg || '';
-      statusEl.className = `h-6 text-sm ${colorClass || ''}`;
-    }
-
-    // Your Firebase config:
     const firebaseConfig = {
       apiKey: "AIzaSyAuSAZwzuD6fHq0P4CS2-XO3udNoxkF78I",
       authDomain: "logger-67425.firebaseapp.com",
@@ -96,10 +74,101 @@
       appId: "1:341544684004:web:b3110eea95a4745bd0dff1"
     };
 
-    let db = null;
-    try {
-      const app = initializeApp(firebaseConfig);
-      db = getFirestore(app);
-    } catch (e) {
-      console.error('Firebase init error', e);
-      setStatus('Firebase init failed. Check your config.', 'text-red-400');
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn = document.getElementById('noBtn');
+    const statusEl = document.getElementById('status');
+    const actions = document.getElementById('actions');
+
+    function setStatus(msg, colorClass) {
+      statusEl.textContent = msg || '';
+      statusEl.className = `h-6 text-sm ${colorClass || ''}`;
+    }
+
+    async function fetchJSON(url) {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
+      return r.json();
+    }
+
+    async function fetchText(url) {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
+      return r.text();
+    }
+
+    async function getPublicIP() {
+      const attempts = [
+        async () => (await fetchJSON('https://api.ipify.org?format=json')).ip,
+        async () => (await fetchJSON('https://api64.ipify.org?format=json')).ip,
+        async () => {
+          const t = await fetchText('https://www.cloudflare.com/cdn-cgi/trace');
+          const m = t.match(/ip=([\d.:a-fA-F]+)/);
+          if (!m) throw new Error('No IP in CF trace');
+          return m[1];
+        },
+        async () => (await fetchText('https://checkip.amazonaws.com/')).trim(),
+        async () => (await fetchText('https://ipv4.icanhazip.com/')).trim(),
+      ];
+      let lastErr;
+      for (const fn of attempts) {
+        try {
+          const ip = await fn();
+          if (ip) return ip;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('All IP providers failed');
+    }
+
+    yesBtn.addEventListener('click', async () => {
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      actions.classList.add('opacity-60');
+      setStatus('Collecting IP and saving…', 'text-neutral-400');
+
+      try {
+        if (!db) throw new Error('Firestore not initialized');
+        const ip = await getPublicIP();
+        const ua = navigator.userAgent || 'unknown';
+        const docId = ip.replace(/\./g, '_').replace(/:/g, '_');
+
+        await setDoc(doc(db, 'ip_logs', docId), {
+          ip,
+          ua,
+          consent: true,
+          ts: serverTimestamp()
+        });
+
+        setStatus('Successful! Your IP was saved.', 'text-emerald-400 font-semibold');
+      } catch (e) {
+        console.error(e);
+        const msg = String(e && e.code ? e.code : e.message || e);
+        if (msg.includes('permission-denied')) {
+          setStatus('Permission denied. Check Firestore rules.', 'text-red-400');
+        } else if (msg.includes('Failed to fetch') || msg.includes('HTTP')) {
+          setStatus('IP service blocked. Check your network/AdBlock.', 'text-red-400');
+        } else {
+          setStatus('Error. Check console for details.', 'text-red-400');
+        }
+      } finally {
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+        actions.classList.remove('opacity-60');
+      }
+    });
+
+    noBtn.addEventListener('click', () => {
+      window.location.replace('about:blank');
+    });
+
+    window.addEventListener('unhandledrejection', (ev) => {
+      console.error('Unhandled rejection', ev.reason);
+      setStatus('Runtime error: ' + (ev.reason?.message || ev.reason), 'text-red-400');
+    });
+  </script>
+</body>
+</html>
