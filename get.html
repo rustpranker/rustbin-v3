@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -25,64 +25,47 @@
       border-radius: 1rem;
     }
     .glow { box-shadow: 0 0 40px rgba(0,255,170,.15), inset 0 0 40px rgba(0,255,170,.05); }
-
-    #container {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-      position: relative;
-    }
-
-    #backBtn {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      cursor: pointer;
-      border-radius: 12px;
-    }
   </style>
 </head>
-<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200">
-  <div id="container" class="bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow">
-    <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-6 text-center">
+<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200 relative p-4">
+
+  <main class="max-w-4xl mx-auto bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow relative">
+    <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-6">
       <span class="block text-neutral-300">RUSTBIN</span>
       <span class="block mt-2 text-emerald-300 animate-[glitch_1.2s_infinite]">IP Logs</span>
     </h1>
 
-    <div class="mb-6 text-center">
-      <label for="codeInput" class="block mb-2 text-neutral-300 font-semibold">Enter Access Code</label>
+    <form id="accessForm" class="mb-6 flex gap-4 items-center">
       <input
-        id="codeInput"
-        maxlength="10"
+        id="accessCode"
         type="text"
-        class="w-full px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 focus:outline-none focus:border-emerald-400"
-        placeholder="Enter 10-digit code"
-        autocomplete="off"
+        maxlength="10"
+        placeholder="Enter 10-character code"
+        class="flex-grow rounded-xl px-4 py-2 bg-neutral-800 border border-neutral-700 text-neutral-100 focus:outline-emerald-400"
+        required
       />
-      <button id="submitCode" class="mt-4 w-full px-4 py-2 rounded-xl border border-emerald-400/50 hover:border-emerald-400 transition font-semibold text-emerald-300">
+      <button
+        type="submit"
+        class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 transition font-semibold text-emerald-300"
+      >
         Submit
       </button>
-      <p id="codeStatus" class="mt-2 h-6 text-sm"></p>
-    </div>
+    </form>
 
-    <div id="logsContainer" class="max-h-[400px] overflow-y-auto bg-neutral-800/70 rounded-xl p-4 text-sm font-mono hidden">
+    <div id="status" class="h-6 text-sm mb-4"></div>
+
+    <div id="ipList" class="max-h-[400px] overflow-y-auto bg-neutral-800 rounded-xl p-4 text-sm font-mono text-emerald-300 whitespace-pre-wrap">
       <!-- IP logs will appear here -->
     </div>
 
-    <button id="backBtn" class="px-4 py-2 rounded-xl border border-red-400/50 hover:border-red-400 transition font-semibold text-red-300 bg-neutral-900/70">
+    <a href="index.html" class="absolute top-4 right-4 px-3 py-1 rounded-xl border border-emerald-400/50 hover:border-emerald-400 text-emerald-300 font-semibold cursor-pointer select-none shadow-glow transition">
       Back
-    </button>
-  </div>
+    </a>
+  </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      getDocs,
-      query,
-      orderBy
-    } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAuSAZwzuD6fHq0P4CS2-XO3udNoxkF78I",
@@ -96,8 +79,23 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const accessCode = "JzxJdzGet9";
-    const codeInput = document.getElementById('codeInput');
-    const submitCode = document.getElementById('submitCode');
-    const codeStatus = document.getElementById('codeStatus');
-    const logsContainer = document.get
+    const form = document.getElementById('accessForm');
+    const input = document.getElementById('accessCode');
+    const statusEl = document.getElementById('status');
+    const ipList = document.getElementById('ipList');
+
+    function setStatus(msg, colorClass) {
+      statusEl.textContent = msg || '';
+      statusEl.className = `h-6 text-sm mb-4 ${colorClass || ''}`;
+    }
+
+    async function loadIPs() {
+      setStatus('Loading IP logs...', 'text-neutral-400');
+      ipList.textContent = '';
+
+      try {
+        const q = query(collection(db, 'ip_logs'), orderBy('ts', 'desc'));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          ipList.textContent = '
