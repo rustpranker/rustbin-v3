@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RUSTBIN • IP Consent</title>
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes glitch {
+      0% { text-shadow: 2px 0 rgba(255,0,0,.5), -2px 0 rgba(0,255,255,.5); }
+      20% { text-shadow: -2px 0 rgba(255,0,0,.5), 2px 0 rgba(0,255,255,.5); }
+      40% { text-shadow: 2px 0 rgba(255,0,0,.5), -2px 0 rgba(0,255,255,.5); }
+      60% { text-shadow: -2px 0 rgba(255,0,0,.5), 2px 0 rgba(0,255,255,.5); }
+      80% { text-shadow: 2px 0 rgba(255,0,0,.5), -2px 0 rgba(0,255,255,.5); }
+      100% { text-shadow: -2px 0 rgba(255,0,0,.5), 2px 0 rgba(0,255,255,.5); }
+    }
+    .scanline::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 2px,
+        transparent 3px,
+        transparent 6px
+      );
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      border-radius: 1rem;
+    }
+    .glow { box-shadow: 0 0 40px rgba(0,255,170,.15), inset 0 0 40px rgba(0,255,170,.05); }
+  </style>
+</head>
+<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200">
+  <main class="min-h-screen flex items-center justify-center p-4">
+    <div class="relative w-full max-w-2xl bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow">
+      <div class="text-center space-y-6">
+        <h1 class="text-4xl md:text-5xl font-black tracking-tight">
+          <span class="block text-neutral-300">RUSTBIN</span>
+          <span class="block mt-2 text-emerald-300 animate-[glitch_1.2s_infinite]">Main Menu</span>
+        </h1>
+        <p id="question" class="text-lg md:text-xl text-neutral-300">
+          You sure want share you ip with you friend ?
+        </p>
+        <div id="actions" class="flex items-center justify-center gap-4">
+          <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold">
+            YES
+          </button>
+          <button id="noBtn" class="px-5 py-2.5 rounded-xl border border-red-400/50 hover:border-red-400 hover:translate-y-[-1px] transition font-semibold">
+            NO
+          </button>
+        </div>
+        <p id="status" class="h-6 text-sm"></p>
+        <div class="text-xs text-neutral-400 leading-relaxed max-w-xl mx-auto">
+          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you give explicit consent to collect and store your public IP address, browser user‑agent, and timestamp in Firebase. Data is used only for the stated purpose and not shared publicly. Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
+        </div>
+      </div>
+
+      <!-- Footnote / brand -->
+      <div class="absolute -bottom-3 left-6 right-6 text-center">
+        <span class="px-3 py-1 text-[10px] tracking-widest uppercase bg-neutral-800 border border-neutral-700 rounded-full text-neutral-400">rustbin · ip consent logger</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Firebase + App Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
+      authDomain: "test-f5bde.firebaseapp.com",
+      projectId: "test-f5bde",
+      storageBucket: "test-f5bde.firebasestorage.app",
+      messagingSenderId: "803807833739",
+      appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
+      measurementId: "G-JXNNEMMRDC"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn = document.getElementById('noBtn');
+    const statusEl = document.getElementById('status');
+    const actions = document.getElementById('actions');
+
+    function setStatus(msg, colorClass) {
+      statusEl.textContent = msg || '';
+      statusEl.className = `h-6 text-sm ${colorClass || ''}`;
+    }
+
+    async function getPublicIP() {
+      const res = await fetch('https://api.ipify.org?format=json');
+      if (!res.ok) throw new Error('failed');
+      const data = await res.json();
+      return data.ip;
+    }
+
+    yesBtn.addEventListener('click', async () => {
+      yesBtn.disabled = true; noBtn.disabled = true; actions.classList.add('opacity-60');
+      setStatus('Collecting IP and saving…', 'text-neutral-400');
+
+      try {
+        const ip = await getPublicIP();
+        const ua = navigator.userAgent || 'unknown';
+
+        await addDoc(collection(db, 'ip_logs'), {
+          ip,
+          ua,
+          consent: true,
+          ts: serverTimestamp()
+        });
+
+        setStatus('sucefull!', 'text-emerald-400 font-semibold');
+      } catch (e) {
+        console.error(e);
+        setStatus('Error. Try again later.', 'text-red-400');
+        yesBtn.disabled = false; noBtn.disabled = false; actions.classList.remove('opacity-60');
+      }
+    });
+
+    noBtn.addEventListener('click', () => {
+      window.location.replace('about:blank');
+    });
+  </script>
+</body>
+</html>
