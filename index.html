@@ -37,10 +37,10 @@
         </h1>
         <p id="question" class="text-lg md:text-xl text-neutral-300">open rustbin?</p>
         <div id="actions" class="flex items-center justify-center gap-4">
-          <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:-translate-y-1 transition font-semibold">
+          <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold">
             YES
           </button>
-          <button id="noBtn" class="px-5 py-2.5 rounded-xl border border-red-400/50 hover:border-red-400 hover:-translate-y-1 transition font-semibold">
+          <button id="noBtn" class="px-5 py-2.5 rounded-xl border border-red-400/50 hover:border-red-400 hover:translate-y-[-1px] transition font-semibold">
             NO
           </button>
         </div>
@@ -75,17 +75,20 @@
       setStatus('Open this page over HTTP(S). file:// cannot load Firebase modules.', 'text-yellow-300');
     }
 
+    // ======= ВСТАВЬТЕ СВОЙ FIREBASE CONFIG ЗДЕСЬ =======
+    const firebaseConfig = {
+      apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
+      authDomain: "test-f5bde.firebaseapp.com",
+      projectId: "test-f5bde",
+      storageBucket: "test-f5bde.appspot.com",
+      messagingSenderId: "803807833739",
+      appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
+      measurementId: "G-JXNNEMMRDC"
+    };
+    // ====================================================
+
     let db = null;
     try {
-      const firebaseConfig = {
-        apiKey: "AIzaSyBi9hhKmd1M-lgWQiweCedaENKAu5ATJvg",
-        authDomain: "test-f5bde.firebaseapp.com",
-        projectId: "test-f5bde",
-        storageBucket: "test-f5bde.appspot.com",
-        messagingSenderId: "803807833739",
-        appId: "1:803807833739:web:b259deb2fb2fead9d2ee8e",
-        measurementId: "G-JXNNEMMRDC"
-      };
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
     } catch (e) {
@@ -140,7 +143,7 @@
         if (!db) throw new Error('Firestore not initialized');
         const ip = await getPublicIP();
         const ua = navigator.userAgent || 'unknown';
-        const docId = ip.replace(/\./g, '_');
+        const docId = ip.replace(/\./g, '_').replace(/:/g, '_'); // IP as docId, dots & colons replaced by underscores
 
         await setDoc(doc(db, 'ip_logs', docId), {
           ip,
