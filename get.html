@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RUSTBIN • IP List</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes glitch {
+      0%, 40%, 80% { text-shadow: 2px 0 rgba(255,0,0,.5), -2px 0 rgba(0,255,255,.5); }
+      20%, 60%, 100% { text-shadow: -2px 0 rgba(255,0,0,.5), 2px 0 rgba(0,255,255,.5); }
+    }
+    .scanline::after {
+      content: "";
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 2px,
+        transparent 3px,
+        transparent 6px
+      );
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      border-radius: 1rem;
+    }
+    .glow { box-shadow: 0 0 40px rgba(0,255,170,.15), inset 0 0 40px rgba(0,255,170,.05); }
+  </style>
+</head>
+<body class="min-h-screen bg-neutral-950 text-neutral-100 selection:bg-emerald-300/20 selection:text-emerald-200">
+  <main class="min-h-screen flex flex-col items-center justify-center p-4 relative">
+    <div class="relative w-full max-w-4xl bg-neutral-900/60 border border-neutral-700 rounded-2xl p-8 scanline glow">
+      <h1 class="text-4xl md:text-5xl font-black tracking-tight mb-6">
+        <span class="block text-neutral-300">RUSTBIN</span>
+        <span class="block mt-2 text-emerald-300 animate-[glitch_1.2s_infinite]">IP List</span>
+      </h1>
+
+      <div id="ipList" class="max-h-96 overflow-auto text-neutral-300 font-mono bg-neutral-800 p-4 rounded-lg whitespace-pre-wrap">
+        <p class="italic">Enter code to view IP list</p>
+      </div>
+    </div>
+
+    <button id="getBtn" 
+      class="fixed top-6 right-6 px-4 py-2 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold bg-neutral-900/70 backdrop-blur-sm">
+      Get
+    </button>
+
+    <div id="codeModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden">
+      <div class="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 max-w-sm w-full space-y-4 scanline glow relative">
+        <h2 class="text-xl font-bold text-emerald-300">Enter Access Code</h2>
+        <input type="text" id="accessCodeInput" maxlength="10" placeholder="Enter 10-char code"
+          class="w-full p-2 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-100 font-mono focus:outline-emerald-400" />
+        <div class="flex justify-between">
+          <button id="submitCodeBtn" class="px-4 py-2 rounded-xl border border-emerald-400/50 hover:border-emerald-400 transition font-semibold">
+            Submit
+          </button>
+          <button id="cancelCodeBtn" class="px-4 py-2 rounded-xl border border-red-400/50 hover:border-red-400 transition font-semibold">
+            Cancel
+          </button>
+        </div>
+        <p id="codeStatus" class="text-sm text-red-500 h-5"></p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const getBtn = document.getElementById('getBtn');
+    const codeModal = document.getElementById('codeModal');
+    const submitCodeBtn = document.getElementById('submitCodeBtn');
+    const cancelCodeBtn = document.getElementById('cancelCodeBtn');
+    const accessCodeInput = document.getElementById('accessCodeInput');
+    const codeStatus = document.getElementById('codeStatus');
+    const ipList = document.getElementById('ipList');
+
+    const ACCESS_CODE = 'JzxJdzGet9';
+
+    getBtn.addEventListener('click', () => {
+      codeStatus.textContent = '';
+      accessCodeInput.value = '';
+      codeModal.classList.remove('hidden');
+      accessCodeInput.focus();
+    });
+
+    cancelCodeBtn.addEventListener('click', () => {
+      codeModal.classList.add('hidden');
+      codeStatus.textContent = '';
+    });
+
+    submitCodeBtn.addEventListener('click', () => {
+      const val = accessCodeInput.value.trim();
+      if (val === ACCESS_CODE) {
+        codeStatus.textContent = '';
+        codeModal.classList.add('hidden');
+        showIPList();
+      } else {
+        codeStatus.textContent = 'Incorrect code!';
+      }
+    });
+
+    function showIPList() {
+      const savedIPs = JSON.parse(localStorage.getItem('savedIPs') || '[]');
+      if (savedIPs.length === 0) {
+        ipList.textContent = 'No IPs saved yet.';
+        return;
+      }
+      // Формируем красивый список с IP, датой и userAgent
+      let html = '';
+      savedIPs.forEach(({ ip, ua, ts }, i) => {
+        html += `${i + 1}. IP: ${ip}\n   Date: ${new Date(ts).toLocaleString()}\n   UA: ${ua}\n\n`;
+      });
+      ipList.textContent = html;
+    }
+
+    // Закрываем модал, если кликаешь вне блока
+    codeModal.addEventListener('click', e => {
+      if (e.target === codeModal) {
+        codeModal.classList.add('hidden');
+        codeStatus.textContent = '';
+      }
+    });
+  </script>
+</body>
+</html>
